@@ -66,16 +66,19 @@ class _AppListState extends State<AppList> {
           margin: EdgeInsets.all(20),
           child: Hero(
             tag: "AppModel${appModel.id}",
-//            flightShuttleBuilder: (flightContext, anim, direction,
-//                fromHeroContext, toHeroContext) {
-//              return Container(
-//                color: Colors.red,
-//              );
-//            },
             createRectTween: (begin, end) {
-//              print('_AppListingPageState.build 1');
-//              print('_AppListState.build: $begin $end');
               return SrcRectTween(a: begin, b: end);
+            },
+            flightShuttleBuilder: (flightContext, anim, flightDirection,
+                fromHeroContext, toHeroContext) {
+              Hero hero;
+              if (flightDirection == HeroFlightDirection.pop) {
+                hero = fromHeroContext.widget;
+              } else {
+                hero = toHeroContext.widget;
+              }
+
+              return hero.child;
             },
             child: AppStoreItem(
               appModel: appModel,
@@ -92,7 +95,7 @@ class _AppListState extends State<AppList> {
                         ),
                       );
                     },
-                    transitionDuration: Duration(milliseconds: 600),
+                    transitionDuration: Duration(milliseconds: 700),
                     opaque: false));
               },
             ),
