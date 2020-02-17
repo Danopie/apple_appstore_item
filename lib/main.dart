@@ -57,6 +57,8 @@ class _AppListState extends State<AppList> {
           "Dive into the vast world of Thoros",
           index.toString()));
 
+  final _borderTween = Tween<double>(begin: 14, end: 0);
+
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
@@ -78,7 +80,17 @@ class _AppListState extends State<AppList> {
                 hero = toHeroContext.widget;
               }
 
-              return hero.child;
+              return AnimatedBuilder(
+                child: hero.child,
+                builder: (context, widget) {
+                  return ClipRRect(
+                    borderRadius:
+                        BorderRadius.circular(_borderTween.evaluate(anim)),
+                    child: widget,
+                  );
+                },
+                animation: anim,
+              );
             },
             child: AppStoreItem(
               appModel: appModel,
@@ -176,12 +188,7 @@ class _AppStoreItemState extends State<AppStoreItem>
     with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: _buildChild(),
-      physics: widget.expanded
-          ? ClampingScrollPhysics()
-          : NeverScrollableScrollPhysics(),
-    );
+    return _buildChild();
   }
 
   Widget _buildChild() {
@@ -202,13 +209,13 @@ class _AppStoreItemState extends State<AppStoreItem>
                       }
                     : null,
               ),
-              _buildBottomItem()
+              if (widget.expanded) Flexible(child: _buildBottomItem())
             ],
           ),
           AnimatedPositioned(
             duration: Duration(milliseconds: 300),
-            right: widget.expanded ? 20 : 40,
-            top: widget.expanded ? 14 : 40,
+            right: widget.expanded ? 15 : 40,
+            top: widget.expanded ? 25 : 40,
             child: AnimatedOpacity(
               duration: Duration(milliseconds: 300),
               opacity: widget.expanded ? 1.0 : 0,
@@ -305,6 +312,7 @@ class _AppStoreItemState extends State<AppStoreItem>
       padding: EdgeInsets.all(20),
       child: Text(
         widget.appModel.description,
+        overflow: TextOverflow.fade,
         style: TextStyle(
             fontWeight: FontWeight.normal,
             fontSize: 14,
@@ -324,45 +332,47 @@ class AppListingPage extends StatefulWidget {
 }
 
 class _AppListingPageState extends State<AppListingPage> {
+  final _controller = ScrollController();
+
   @override
   void initState() {
     FlutterStatusbarManager.setHidden(true,
         animation: StatusBarAnimation.SLIDE);
+    _controller.addListener(() {
+      if (_controller.offset < -_SwipeHandlerState.kMaxDistance) {
+        _controller.jumpTo(-_SwipeHandlerState.kMaxDistance);
+      }
+    });
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      child: Scaffold(
-          backgroundColor: Colors.transparent,
-          body: ClipRect(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-              child: SwipeHandler(
-                onUserSwipe: () {
-                  Navigator.of(context).pop();
-                },
-                child: SingleChildScrollView(
-                  physics: ClampingScrollPhysics(),
-                  child: Hero(
-                    createRectTween: (begin, end) {
-                      return DestRectTween(a: begin, b: end);
-                    },
-                    tag: "AppModel${widget.appModel.id}",
-                    child: AppStoreItem(
-                      appModel: widget.appModel,
-                      expanded: true,
-                      onClose: () async {
-                        await FlutterStatusbarManager.setHidden(false,
-                            animation: StatusBarAnimation.SLIDE);
-                      },
-                    ),
-                  ),
-                ),
-              ),
+    return BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+      child: SwipeHandler(
+        onUserSwipe: () {
+          Navigator.of(context).pop();
+        },
+        child: SingleChildScrollView(
+          controller: _controller,
+          physics: BouncingScrollPhysics(),
+          child: Hero(
+            createRectTween: (begin, end) {
+              return DestRectTween(a: begin, b: end);
+            },
+            tag: "AppModel${widget.appModel.id}",
+            child: AppStoreItem(
+              appModel: widget.appModel,
+              expanded: true,
+              onClose: () async {
+                await FlutterStatusbarManager.setHidden(false,
+                    animation: StatusBarAnimation.SLIDE);
+              },
             ),
-          )),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -427,7 +437,7 @@ class SwipeHandler extends StatefulWidget {
 
 class _SwipeHandlerState extends State<SwipeHandler>
     with SingleTickerProviderStateMixin {
-  static const kMaxDistance = 30;
+  static const kMaxDistance = 30.0;
   static const kEdgeOffset = 50;
   final scaleTween = Tween<double>(begin: 1.0, end: .85);
   final radiusTween = Tween<double>(begin: 0, end: 16);
@@ -436,57 +446,92 @@ class _SwipeHandlerState extends State<SwipeHandler>
 
   AnimationController controller;
   bool gestureIsFromEdge = false;
+  bool userSwipeCalled = false;
 
   @override
   void initState() {
     controller =
         AnimationController(vsync: this, duration: Duration(milliseconds: 300));
-    controller.addListener(() {
-      setState(() {});
-    });
     super.initState();
   }
 
   @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      child: Transform.scale(
-        child: ClipRRect(
-          child: widget.child,
-          borderRadius: BorderRadius.circular(radiusTween.evaluate(controller)),
-        ),
-        scale: scaleTween.evaluate(
-            CurvedAnimation(curve: Curves.easeIn, parent: controller)),
-      ),
-      onHorizontalDragStart: (details) {
-        gestureIsFromEdge = _isGestureFromEdge(
-            context, details.globalPosition.dx, Axis.horizontal);
-        distance = 0;
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, widget) {
+        return NotificationListener<ScrollUpdateNotification>(
+          onNotification: (noti) {
+            distance = noti.metrics.pixels;
+            if (distance < 0) {
+              if (distance <= -kMaxDistance) {
+                _handleUserSwipeCall();
+              } else {
+                final positiveDistance = -noti.metrics.pixels;
+                controller.value = positiveDistance / kMaxDistance;
+              }
+            }
+
+            return false;
+          },
+          child: GestureDetector(
+            child: Transform.scale(
+//        child: ClipRRect(
+//          child: widget.child,
+//          borderRadius: BorderRadius.circular(radiusTween.evaluate(controller)),
+//        ),
+              child: Container(
+                child: widget,
+              ),
+              scale: scaleTween.evaluate(
+                  CurvedAnimation(curve: Curves.easeIn, parent: controller)),
+            ),
+            onHorizontalDragStart: (details) {
+              gestureIsFromEdge = _isGestureFromEdge(
+                  context, details.globalPosition.dx, Axis.horizontal);
+              distance = 0;
+            },
+            onVerticalDragStart: (details) {
+              gestureIsFromEdge = _isGestureFromEdge(
+                  context, details.globalPosition.dy, Axis.vertical);
+              distance = 0;
+            },
+            onHorizontalDragUpdate: (details) {
+              _onDragUpdate(details);
+            },
+            onVerticalDragUpdate: (details) {
+              _onDragUpdate(details);
+            },
+            onHorizontalDragEnd: (details) {
+              _reset();
+            },
+            onHorizontalDragCancel: () {
+              _reset();
+            },
+            onVerticalDragEnd: (details) {
+              _reset();
+            },
+            onVerticalDragCancel: () {
+              _reset();
+            },
+          ),
+        );
       },
-      onVerticalDragStart: (details) {
-        gestureIsFromEdge = _isGestureFromEdge(
-            context, details.globalPosition.dy, Axis.vertical);
-        distance = 0;
-      },
-      onHorizontalDragUpdate: (details) {
-        _onDragUpdate(details);
-      },
-      onVerticalDragUpdate: (details) {
-        _onDragUpdate(details);
-      },
-      onHorizontalDragEnd: (details) {
-        _reset();
-      },
-      onHorizontalDragCancel: () {
-        _reset();
-      },
-      onVerticalDragEnd: (details) {
-        _reset();
-      },
-      onVerticalDragCancel: () {
-        _reset();
-      },
+      child: widget.child,
     );
+  }
+
+  void _handleUserSwipeCall() {
+    if (!userSwipeCalled) {
+      userSwipeCalled = true;
+      widget.onUserSwipe();
+    }
   }
 
   bool _isGestureFromEdge(BuildContext context, double position, Axis axis) {
@@ -504,7 +549,7 @@ class _SwipeHandlerState extends State<SwipeHandler>
         final positiveDistance = distance > 0 ? distance : -distance;
         controller.value = positiveDistance / kMaxDistance;
       } else {
-        widget.onUserSwipe();
+        _handleUserSwipeCall();
       }
     }
   }
