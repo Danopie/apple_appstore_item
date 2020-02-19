@@ -175,10 +175,16 @@ class AppStoreItem extends StatefulWidget {
   final bool expanded;
   final Function(BuildContext) onTap;
   final Function onClose;
+  final SwipeController swipeController;
 
-  const AppStoreItem(
-      {Key key, this.appModel, this.onTap, this.expanded = false, this.onClose})
-      : super(key: key);
+  const AppStoreItem({
+    Key key,
+    this.appModel,
+    this.onTap,
+    this.expanded = false,
+    this.onClose,
+    this.swipeController,
+  }) : super(key: key);
 
   @override
   _AppStoreItemState createState() => _AppStoreItemState();
@@ -212,38 +218,51 @@ class _AppStoreItemState extends State<AppStoreItem>
               if (widget.expanded) Flexible(child: _buildBottomItem())
             ],
           ),
-          AnimatedPositioned(
-            duration: Duration(milliseconds: 300),
-            right: widget.expanded ? 15 : 40,
-            top: widget.expanded ? 25 : 40,
-            child: AnimatedOpacity(
-              duration: Duration(milliseconds: 300),
-              opacity: widget.expanded ? 1.0 : 0,
+          if (widget.swipeController != null)
+            AnimatedBuilder(
+              animation: widget.swipeController,
               child: _buildCloseButton(),
-            ),
-          )
+              builder: (context, child) {
+                double opacity = widget.swipeController.distance /
+                    widget.swipeController.maxSwipeDistance;
+                if (opacity > 1)
+                  opacity = 1;
+                else if (opacity < 0) opacity = 0;
+
+                return Opacity(
+                  opacity: 1 - opacity,
+                  child: child,
+                );
+              },
+            )
         ]),
       ),
     );
   }
 
   Widget _buildCloseButton() {
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onTap: () async {
-        if (widget.expanded) {
-          if (widget.onClose != null) {
-            await widget.onClose();
-          }
-          Navigator.of(context).pop();
-        }
-      },
+    return Align(
+      alignment: Alignment.topRight,
       child: Container(
-        padding: EdgeInsets.all(12),
-        child: Icon(
-          Icons.cancel,
-          color: Colors.grey[200],
-          size: 36,
+        margin: EdgeInsets.only(right: 20, top: 25),
+        child: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () async {
+            if (widget.expanded) {
+              if (widget.onClose != null) {
+                await widget.onClose();
+              }
+              Navigator.of(context).pop();
+            }
+          },
+          child: Container(
+            padding: EdgeInsets.all(12),
+            child: Icon(
+              Icons.cancel,
+              color: Colors.grey[200],
+              size: 36,
+            ),
+          ),
         ),
       ),
     );
@@ -332,15 +351,16 @@ class AppListingPage extends StatefulWidget {
 }
 
 class _AppListingPageState extends State<AppListingPage> {
-  final _controller = ScrollController();
+  final _scrollController = ScrollController();
+  final _swipeController = SwipeController();
 
   @override
   void initState() {
     FlutterStatusbarManager.setHidden(true,
         animation: StatusBarAnimation.SLIDE);
-    _controller.addListener(() {
-      if (_controller.offset < -_SwipeHandlerState.kMaxDistance) {
-        _controller.jumpTo(-_SwipeHandlerState.kMaxDistance);
+    _scrollController.addListener(() {
+      if (_scrollController.offset < -_swipeController.maxSwipeDistance) {
+        _scrollController.jumpTo(-_swipeController.maxSwipeDistance);
       }
     });
     super.initState();
@@ -350,12 +370,13 @@ class _AppListingPageState extends State<AppListingPage> {
   Widget build(BuildContext context) {
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-      child: SwipeHandler(
+      child: SwipeView(
+        controller: _swipeController,
         onUserSwipe: () {
           Navigator.of(context).pop();
         },
         child: SingleChildScrollView(
-          controller: _controller,
+          controller: _scrollController,
           physics: BouncingScrollPhysics(),
           child: Hero(
             createRectTween: (begin, end) {
@@ -365,6 +386,7 @@ class _AppListingPageState extends State<AppListingPage> {
             child: AppStoreItem(
               appModel: widget.appModel,
               expanded: true,
+              swipeController: _swipeController,
               onClose: () async {
                 await FlutterStatusbarManager.setHidden(false,
                     animation: StatusBarAnimation.SLIDE);
@@ -425,56 +447,78 @@ class _BouncingButtonState extends State<BouncingButton>
   }
 }
 
-class SwipeHandler extends StatefulWidget {
+class SwipeController extends ChangeNotifier {
+  final maxSwipeDistance = 30.0;
+  final edgeOffset = 50;
+
+  double _distance = 0;
+
+  set distance(double distance) {
+    _distance = distance;
+    notifyListeners();
+  }
+
+  double get distance => _distance;
+}
+
+class SwipeView extends StatefulWidget {
+  final SwipeController controller;
   final Function onUserSwipe;
   final Widget child;
 
-  const SwipeHandler({Key key, this.onUserSwipe, this.child}) : super(key: key);
+  const SwipeView({Key key, this.onUserSwipe, this.child, this.controller})
+      : super(key: key);
 
   @override
-  _SwipeHandlerState createState() => _SwipeHandlerState();
+  _SwipeViewState createState() => _SwipeViewState();
 }
 
-class _SwipeHandlerState extends State<SwipeHandler>
+class _SwipeViewState extends State<SwipeView>
     with SingleTickerProviderStateMixin {
-  static const kMaxDistance = 30.0;
-  static const kEdgeOffset = 50;
   final scaleTween = Tween<double>(begin: 1.0, end: .85);
   final radiusTween = Tween<double>(begin: 0, end: 16);
 
-  double distance = 0;
-
-  AnimationController controller;
+  AnimationController _animationController;
   bool gestureIsFromEdge = false;
   bool userSwipeCalled = false;
 
+  SwipeController _swipeController;
+
   @override
   void initState() {
-    controller =
+    _animationController =
         AnimationController(vsync: this, duration: Duration(milliseconds: 300));
     super.initState();
   }
 
   @override
+  void didChangeDependencies() {
+    _swipeController = widget.controller ?? SwipeController();
+    super.didChangeDependencies();
+  }
+
+  @override
   void dispose() {
-    controller.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: controller,
+      animation: _animationController,
       builder: (context, widget) {
         return NotificationListener<ScrollUpdateNotification>(
           onNotification: (noti) {
-            distance = noti.metrics.pixels;
-            if (distance < 0) {
-              if (distance <= -kMaxDistance) {
+            _swipeController.distance = noti.metrics.pixels;
+            if (_swipeController.distance < 0) {
+              if (_swipeController.distance <=
+                  -_swipeController.maxSwipeDistance) {
                 _handleUserSwipeCall();
               } else {
                 final positiveDistance = -noti.metrics.pixels;
-                controller.value = positiveDistance / kMaxDistance;
+                _animationController.value =
+                    positiveDistance / _swipeController.maxSwipeDistance;
               }
             }
 
@@ -482,25 +526,21 @@ class _SwipeHandlerState extends State<SwipeHandler>
           },
           child: GestureDetector(
             child: Transform.scale(
-//        child: ClipRRect(
-//          child: widget.child,
-//          borderRadius: BorderRadius.circular(radiusTween.evaluate(controller)),
-//        ),
               child: Container(
                 child: widget,
               ),
-              scale: scaleTween.evaluate(
-                  CurvedAnimation(curve: Curves.easeIn, parent: controller)),
+              scale: scaleTween.evaluate(CurvedAnimation(
+                  curve: Curves.easeIn, parent: _animationController)),
             ),
             onHorizontalDragStart: (details) {
               gestureIsFromEdge = _isGestureFromEdge(
                   context, details.globalPosition.dx, Axis.horizontal);
-              distance = 0;
+              _swipeController.distance = 0;
             },
             onVerticalDragStart: (details) {
               gestureIsFromEdge = _isGestureFromEdge(
                   context, details.globalPosition.dy, Axis.vertical);
-              distance = 0;
+              _swipeController.distance = 0;
             },
             onHorizontalDragUpdate: (details) {
               _onDragUpdate(details);
@@ -538,16 +578,22 @@ class _SwipeHandlerState extends State<SwipeHandler>
     final screenSize = MediaQuery.of(context).size;
     final length =
         axis == Axis.horizontal ? screenSize.width : screenSize.height;
-    return position < kEdgeOffset || position > length - kEdgeOffset;
+    return position < _swipeController.edgeOffset ||
+        position > length - _swipeController.edgeOffset;
   }
 
   void _onDragUpdate(DragUpdateDetails details) {
     if (gestureIsFromEdge) {
-      final positiveDistance = distance > 0 ? distance : -distance;
-      if (positiveDistance <= kMaxDistance) {
-        distance += details.primaryDelta;
-        final positiveDistance = distance > 0 ? distance : -distance;
-        controller.value = positiveDistance / kMaxDistance;
+      final positiveDistance = _swipeController.distance > 0
+          ? _swipeController.distance
+          : -_swipeController.distance;
+      if (positiveDistance <= _swipeController.maxSwipeDistance) {
+        _swipeController.distance += details.primaryDelta;
+        final positiveDistance = _swipeController.distance > 0
+            ? _swipeController.distance
+            : -_swipeController.distance;
+        _animationController.value =
+            positiveDistance / _swipeController.maxSwipeDistance;
       } else {
         _handleUserSwipeCall();
       }
@@ -555,8 +601,8 @@ class _SwipeHandlerState extends State<SwipeHandler>
   }
 
   void _reset() {
-    distance = 0;
-    controller.reverse();
+    _swipeController.distance = 0;
+    _animationController.reverse();
     gestureIsFromEdge = false;
   }
 }
