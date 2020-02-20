@@ -205,7 +205,9 @@ class _AppListingPageState extends State<AppListingPage> {
       filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
       child: SwipeView(
         controller: _swipeController,
-        onUserSwipe: () {
+        onUserSwipe: () async {
+          await FlutterStatusbarManager.setHidden(false,
+              animation: StatusBarAnimation.SLIDE);
           Navigator.of(context).pop();
         },
         child: SingleChildScrollView(
