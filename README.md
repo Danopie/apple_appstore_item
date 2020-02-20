@@ -1,16 +1,28 @@
-# appstore_item
+# Apple App Store Item
 
-A new Flutter application.
+A project that attempts to mimic Apple AppStore Item UX in Flutter.
 
-## Getting Started
+## App Store Inspiration
+![Inspiration](https://github.com/Danopie/apple_appstore_item/blob/master/showcase/app_store.gif)
 
-This project is a starting point for a Flutter application.
+## This project
+![Result](https://github.com/Danopie/apple_appstore_item/blob/master/showcase/result.gif)
 
-A few resources to get you started if this is your first Flutter project:
 
-- [Lab: Write your first Flutter app](https://flutter.dev/docs/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://flutter.dev/docs/cookbook)
 
-For help getting started with Flutter, view our
-[online documentation](https://flutter.dev/docs), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+
+
+
+## Improvement:
+
+- [] Rounded corner animation during user swipe
+- [] Animation for the close button
+- [] Smoother animation
+
+
+
+
+
+
+
+
