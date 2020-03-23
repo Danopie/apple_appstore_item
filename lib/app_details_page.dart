@@ -72,35 +72,26 @@ class _AppDetailsPageState extends State<AppDetailsPage> {
 }
 
 Widget _buildCloseButton(BuildContext context) {
-  return AnimatedBuilder(
-    child: Align(
-      alignment: Alignment.topRight,
-      child: Container(
-        margin: EdgeInsets.only(right: 20, top: 25),
-        child: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () async {
-            await FlutterStatusbarManager.setHidden(false,
-                animation: StatusBarAnimation.SLIDE);
-            Navigator.of(context).pop();
-          },
-          child: Container(
-            padding: EdgeInsets.all(12),
-            child: Icon(
-              Icons.cancel,
-              color: Colors.grey[200],
-              size: 36,
-            ),
+  return Align(
+    alignment: Alignment.topRight,
+    child: Container(
+      margin: EdgeInsets.only(right: 20, top: 25),
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () async {
+          await FlutterStatusbarManager.setHidden(false,
+              animation: StatusBarAnimation.SLIDE);
+          Navigator.of(context).pop();
+        },
+        child: Container(
+          padding: EdgeInsets.all(12),
+          child: Icon(
+            Icons.cancel,
+            color: Colors.grey[200],
+            size: 36,
           ),
         ),
       ),
     ),
-    animation: ModalRoute.of(context).animation,
-    builder: (BuildContext context, Widget child) {
-      return Opacity(
-        child: child,
-        opacity: ModalRoute.of(context).animation.value,
-      );
-    },
   );
 }
