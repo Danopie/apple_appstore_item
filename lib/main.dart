@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:appstore_item/app_details_page.dart';
 import 'package:appstore_item/app_model.dart';
 import 'package:appstore_item/app_store_item.dart';
 import 'package:appstore_item/swipe_view.dart';
@@ -105,7 +106,7 @@ class _AppListState extends State<AppList> {
                           curve: Curves.easeInOut,
                           parent: anim,
                         ),
-                        child: AppListingPage(
+                        child: AppDetailsPage(
                           appModel: appModel,
                         ),
                       );
@@ -172,66 +173,6 @@ class DestRectTween extends RectTween {
   }
 }
 
-
-
-class AppListingPage extends StatefulWidget {
-  final AppModel appModel;
-
-  const AppListingPage({Key key, this.appModel}) : super(key: key);
-
-  @override
-  _AppListingPageState createState() => _AppListingPageState();
-}
-
-class _AppListingPageState extends State<AppListingPage> {
-  final _scrollController = ScrollController();
-  final _swipeController = SwipeController();
-
-  @override
-  void initState() {
-    FlutterStatusbarManager.setHidden(true,
-        animation: StatusBarAnimation.SLIDE);
-    _scrollController.addListener(() {
-      if (_scrollController.offset < -_swipeController.maxSwipeDistance) {
-        _scrollController.jumpTo(-_swipeController.maxSwipeDistance);
-      }
-    });
-    super.initState();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-      child: SwipeView(
-        controller: _swipeController,
-        onUserSwipe: () async {
-          await FlutterStatusbarManager.setHidden(false,
-              animation: StatusBarAnimation.SLIDE);
-          Navigator.of(context).pop();
-        },
-        child: SingleChildScrollView(
-          controller: _scrollController,
-          physics: BouncingScrollPhysics(),
-          child: Hero(
-            createRectTween: (begin, end) {
-              return DestRectTween(a: begin, b: end);
-            },
-            tag: "AppModel${widget.appModel.id}",
-            child: AppStoreItem(
-              appModel: widget.appModel,
-              expanded: true,
-              onClose: () async {
-                await FlutterStatusbarManager.setHidden(false,
-                    animation: StatusBarAnimation.SLIDE);
-              },
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class BouncingButton extends StatefulWidget {
   final Widget child;

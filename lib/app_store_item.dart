@@ -10,14 +10,12 @@ class AppStoreItem extends StatefulWidget {
   final AppModel appModel;
   final bool expanded;
   final Function(BuildContext) onTap;
-  final Function onClose;
 
   const AppStoreItem({
     Key key,
     this.appModel,
     this.onTap,
     this.expanded = false,
-    this.onClose,
   }) : super(key: key);
 
   @override
@@ -53,40 +51,12 @@ class _AppStoreItemState extends State<AppStoreItem>
               if (widget.expanded) Flexible(child: _buildBottomItem())
             ],
           ),
-          if (widget.expanded)
-            _buildCloseButton()
         ]),
       ),
     );
   }
 
-  Widget _buildCloseButton() {
-    return Align(
-      alignment: Alignment.topRight,
-      child: Container(
-        margin: EdgeInsets.only(right: 20, top: 25),
-        child: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () async {
-            if (widget.expanded) {
-              if (widget.onClose != null) {
-                await widget.onClose();
-              }
-              Navigator.of(context).pop();
-            }
-          },
-          child: Container(
-            padding: EdgeInsets.all(12),
-            child: Icon(
-              Icons.cancel,
-              color: Colors.grey[200],
-              size: 36,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildTopItem() {
     return AspectRatio(
